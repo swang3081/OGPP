@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Environments
+.env
+.venv/
+venv/
+env/
+
+# Checkpoints / models / large artifacts
+*.pt
+*.pth
+*.pkl
+*.ckpt
+inception-*.pt
+
+# Data blobs (keep download/preprocess scripts, not the data)
+*.npz
+*.npy
+*.ply
+*.obj
+*.mtl
+*.stl
+*.binvox
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# Logs / experiment tracking
+log/
+logs/
+runs/
+outputs/
+output/
+mlruns/
+*.log
+mlflow.db
+*.tsp
+*.tour
+
+# Media
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.mkv
+*.mp3
+*.pdf
+*.blend
+*.blend1
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Keep these despite broad rules above
+!requirements.txt
