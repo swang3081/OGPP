@@ -3,14 +3,7 @@
 """
 eval_thomson_multi.py
 
-Evaluation script for the Thomson problem, supporting two modes:
-
-1. 2D mode (--mode 2d):
-   - Outputs (theta, phi), with r = ||velocity||
-   - Converted to Cartesian coordinates before saving
-   - 3D sphere visualization, with r shown by color
-
-2. 3D mode (--mode 3d):
+Evaluation script for the Thomson problem (3D):
    - Outputs xyz coordinates directly
    - 3D point cloud visualization
 """
@@ -42,10 +35,6 @@ from flow_lab.distributions import Uniform
 def build_argparser():
     p = argparse.ArgumentParser(description="Thomson problem evaluation")
 
-    # Mode selection
-    p.add_argument("--mode", type=str, default="3d", choices=["2d", "3d"],
-                   help="Evaluation mode: 2d (theta-phi with r encoding) or 3d (xyz)")
-
     # Required parameters
     p.add_argument("--ckpt", type=str, required=True,
                    help="Checkpoint path (.pt/.pth)")
@@ -62,8 +51,8 @@ def build_argparser():
     p.add_argument("--use_PE", action="store_true",)
 
     # Model parameters (must match training)
-    p.add_argument("--in_out_dim", type=int, default=None,
-                   help="Spatial dimension (auto-set based on mode: 2 for 2d, 3 for 3d)")
+    p.add_argument("--in_out_dim", type=int, default=3,
+                   help="Spatial dimension (3 for 3D xyz)")
     p.add_argument("--embed_dim", type=int, default=256)
     p.add_argument("--depth", type=int, default=6)
     p.add_argument("--num_heads", type=int, default=4)
@@ -217,100 +206,7 @@ def _write_single_frame_ply(args_tuple):
     return t_idx
 
 
-# ----------------- Coordinate conversion functions -----------------
-
-def theta_phi_to_cartesian(theta_phi: np.ndarray, r: np.ndarray = None) -> np.ndarray:
-    """
-    Convert (theta, phi) from [-1,1] to Cartesian coordinates
-
-    Args:
-        theta_phi: (..., 2) array, with theta and phi both in the [-1, 1] range
-        r: (...,) array, radius of each point. If None, r=1.0 is used
-
-    Returns:
-        (..., 3) Cartesian coordinates (x, y, z)
-
-    Coordinate system convention:
-        theta: [-1, 1] -> [0, 2*pi] (azimuthal angle, counterclockwise from the x-axis in the xy plane)
-        phi: [-1, 1] -> [0, pi] (polar angle, measured downward from the z-axis)
-    """
-    theta = (theta_phi[..., 0] + 1) * np.pi       # [-1,1] -> [0, 2*pi]
-    phi = (theta_phi[..., 1] + 1) * np.pi / 2     # [-1,1] -> [0, pi]
-
-    if r is None:
-        r = np.ones_like(theta)
-
-    x = r * np.sin(phi) * np.cos(theta)
-    y = r * np.sin(phi) * np.sin(theta)
-    z = r * np.cos(phi)
-
-    return np.stack([x, y, z], axis=-1)
-
-
-# ----------------- 3D sphere visualization -----------------
-
-def visualize_sphere_with_r(xyz_list: list, r_list: list, save_path: str, sample_indices: list = None):
-    """
-    3D sphere visualization, with r shown by color
-
-    Args:
-        xyz_list: list of (N, 3) arrays, each one is the Cartesian coordinates of a sample
-        r_list: list of (N,) arrays, the r value of each point
-        save_path: save path
-        sample_indices: list of sample indices (used for titles)
-    """
-    n_samples = len(xyz_list)
-    num_cols = min(4, n_samples)
-    num_rows = (n_samples + num_cols - 1) // num_cols
-
-    fig = plt.figure(figsize=(5 * num_cols, 4 * num_rows))
-
-    for i, (xyz, r_i) in enumerate(zip(xyz_list, r_list)):
-        ax = fig.add_subplot(num_rows, num_cols, i + 1, projection='3d')
-
-        # Draw several spherical wireframe meshes as reference
-        r_max = r_i.max()
-        for r_ref in [0.25, 0.5, 0.75, 1.0]:
-            if r_ref <= r_max * 1.1:
-                u = np.linspace(0, 2 * np.pi, 30)
-                v = np.linspace(0, np.pi, 20)
-                X = r_ref * np.outer(np.cos(u), np.sin(v))
-                Y = r_ref * np.outer(np.sin(u), np.sin(v))
-                Z = r_ref * np.outer(np.ones_like(u), np.cos(v))
-                ax.plot_wireframe(X, Y, Z, linewidth=0.2, alpha=0.15, color='gray')
-
-        # Draw points, colored by r
-        scatter = ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2],
-                           c=r_i, cmap='viridis', s=5, alpha=0.8)
-
-        # Add colorbar
-        cbar = plt.colorbar(scatter, ax=ax, shrink=0.6, pad=0.1)
-        cbar.set_label('r (velocity norm)', fontsize=8)
-
-        # Mark the first and last points
-        ax.scatter(xyz[0, 0], xyz[0, 1], xyz[0, 2],
-                   c='red', s=30, marker='o', label='first')
-        ax.scatter(xyz[-1, 0], xyz[-1, 1], xyz[-1, 2],
-                   c='green', s=30, marker='^', label='last')
-
-        ax.set_box_aspect([1, 1, 1])
-        max_range = max(1.2, r_max * 1.1) if r_max > 0 else 1.2
-        ax.set_xlim([-max_range, max_range])
-        ax.set_ylim([-max_range, max_range])
-        ax.set_zlim([-max_range, max_range])
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-
-        r_min, r_max_val = r_i.min(), r_i.max()
-        title = f"Sample {sample_indices[i] if sample_indices else i}\nr: [{r_min:.3f}, {r_max_val:.3f}]"
-        ax.set_title(title)
-
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close(fig)
-    print(f"[VIS] Saved 3D sphere visualization to: {save_path}")
-
+# ----------------- Color mapping -----------------
 
 def r_to_color(r: np.ndarray) -> np.ndarray:
     """
@@ -392,13 +288,9 @@ def visualize_xyz_pointcloud(xyz_list: list, r_list: list, save_path: str, sampl
 def main():
     args = build_argparser().parse_args()
 
-    # Automatically set in_out_dim based on mode
-    if args.in_out_dim is None:
-        args.in_out_dim = 3 if args.mode == "3d" else 2
-
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print(f"[Device] {device}")
-    print(f"[Config] mode = {args.mode}, in_out_dim = {args.in_out_dim}")
+    print(f"[Config] in_out_dim = {args.in_out_dim}")
 
     # Set the random seed
     torch.manual_seed(args.seed)
@@ -470,65 +362,64 @@ def main():
             print(f"[trajectory] xs shape: {xs.shape}")
             print(f"[trajectory] x_final shape: {x_final.shape}")
 
-            # === Export the trajectory PLY sequence (3D mode only) ===
-            if args.mode == "3d":
-                traj_ply_dir = os.path.join(exp_dir, "trajectory_ply")
-                os.makedirs(traj_ply_dir, exist_ok=True)
+            # === Export the trajectory PLY sequence ===
+            traj_ply_dir = os.path.join(exp_dir, "trajectory_ply")
+            os.makedirs(traj_ply_dir, exist_ok=True)
 
-                Xs = xs.detach().cpu().float().numpy()  # (B, T, N, 3)
-                Vs = vs.detach().cpu().float().numpy()  # (B, T, N, 3)
-                B_, T_steps, N_pts, D = Xs.shape
-                assert D == 3
+            Xs = xs.detach().cpu().float().numpy()  # (B, T, N, 3)
+            Vs = vs.detach().cpu().float().numpy()  # (B, T, N, 3)
+            B_, T_steps, N_pts, D = Xs.shape
+            assert D == 3
 
-                if args.is_single_mesh or args.is_single_pcd:
-                    # ===== Single-file mode: merge all batches of each frame into one PLY, parallelized with multiprocessing =====
-                    n_workers = args.num_workers if args.num_workers else cpu_count()
-                    print(
-                        f"[trajectory_ply] exporting {T_steps} frames (single mesh mode), "
-                        f"each frame has {B_} batches × {N_pts} points = {B_ * N_pts} points, "
-                        f"using {n_workers} workers"
-                    )
+            if args.is_single_mesh or args.is_single_pcd:
+                # ===== Single-file mode: merge all batches of each frame into one PLY, parallelized with multiprocessing =====
+                n_workers = args.num_workers if args.num_workers else cpu_count()
+                print(
+                    f"[trajectory_ply] exporting {T_steps} frames (single mesh mode), "
+                    f"each frame has {B_} batches × {N_pts} points = {B_ * N_pts} points, "
+                    f"using {n_workers} workers"
+                )
 
-                    # Prepare multiprocessing arguments
-                    task_args = [
-                        (t_idx, Xs[:, t_idx], Vs[:, t_idx], B_, N_pts, traj_ply_dir, args.output_ply_rgb)
-                        for t_idx in range(T_steps)
-                    ]
+                # Prepare multiprocessing arguments
+                task_args = [
+                    (t_idx, Xs[:, t_idx], Vs[:, t_idx], B_, N_pts, traj_ply_dir, args.output_ply_rgb)
+                    for t_idx in range(T_steps)
+                ]
 
-                    with Pool(n_workers) as pool:
-                        results = pool.map(_write_single_frame_ply, task_args)
+                with Pool(n_workers) as pool:
+                    results = pool.map(_write_single_frame_ply, task_args)
 
-                    print(f"[trajectory_ply] wrote {len(results)} merged PLY files to: {os.path.abspath(traj_ply_dir)}")
+                print(f"[trajectory_ply] wrote {len(results)} merged PLY files to: {os.path.abspath(traj_ply_dir)}")
 
-                else:
-                    # ===== Original mode: one PLY per batch =====
-                    print(
-                        f"[trajectory_ply] exporting {T_steps} time steps "
-                        f"for {B_} batches to {traj_ply_dir} (with velocity normals)"
-                    )
+            else:
+                # ===== Original mode: one PLY per batch =====
+                print(
+                    f"[trajectory_ply] exporting {T_steps} time steps "
+                    f"for {B_} batches to {traj_ply_dir} (with velocity normals)"
+                )
 
-                    for t_idx in range(T_steps):
-                        for b_idx in range(B_):
-                            pts = Xs[b_idx, t_idx]  # (N, 3)
-                            vel = Vs[b_idx, t_idx]  # (N, 3)
+                for t_idx in range(T_steps):
+                    for b_idx in range(B_):
+                        pts = Xs[b_idx, t_idx]  # (N, 3)
+                        vel = Vs[b_idx, t_idx]  # (N, 3)
 
-                            # Normalize the velocity to a unit vector and use it as the normal vector
-                            vel_norm = np.linalg.norm(vel, axis=-1, keepdims=True)
-                            normals = vel / np.maximum(vel_norm, 1e-8)
+                        # Normalize the velocity to a unit vector and use it as the normal vector
+                        vel_norm = np.linalg.norm(vel, axis=-1, keepdims=True)
+                        normals = vel / np.maximum(vel_norm, 1e-8)
 
-                            # Generate batch_idx
-                            batch_idx = np.full(N_pts, b_idx, dtype=np.int32)
+                        # Generate batch_idx
+                        batch_idx = np.full(N_pts, b_idx, dtype=np.int32)
 
-                            ply_name = f"frame_{t_idx:04d}_b{b_idx}.ply"
-                            ply_path = os.path.join(traj_ply_dir, ply_name)
+                        ply_name = f"frame_{t_idx:04d}_b{b_idx}.ply"
+                        ply_path = os.path.join(traj_ply_dir, ply_name)
 
-                            if args.output_ply_rgb:
-                                rgb = _velocity_to_rgb(vel)
-                                _write_ply_with_rgb(ply_path, pts, rgb, batch_idx)
-                            else:
-                                _write_ply_with_batch_idx(ply_path, pts, normals, batch_idx)
+                        if args.output_ply_rgb:
+                            rgb = _velocity_to_rgb(vel)
+                            _write_ply_with_rgb(ply_path, pts, rgb, batch_idx)
+                        else:
+                            _write_ply_with_batch_idx(ply_path, pts, normals, batch_idx)
 
-                    print(f"[trajectory_ply] wrote PLY sequence to: {os.path.abspath(traj_ply_dir)}")
+                print(f"[trajectory_ply] wrote PLY sequence to: {os.path.abspath(traj_ply_dir)}")
         else:
             # ===== Only the final step =====
             x_final = simulator.simulate(x0, ts)  # (B, N, D)
@@ -536,33 +427,18 @@ def main():
         print(f"[Sample] x_final shape: {x_final.shape}")
 
         # Convert to numpy
-        x_final_np = x_final.detach().cpu().numpy()  # (B, N, D)
+        x_final_np = x_final.detach().cpu().numpy()  # (B, N, 3)
 
-        if args.mode == "3d":
-            # 3D mode: these are directly the xyz coordinates
-            xyz_all = x_final_np.astype(np.float32)  # (B, N, 3)
-            # Compute r = ||xyz|| (distance to the origin)
-            r_final_np = np.linalg.norm(x_final_np, axis=-1)  # (B, N)
+        # These are directly the xyz coordinates
+        xyz_all = x_final_np.astype(np.float32)  # (B, N, 3)
+        # Compute r = ||xyz|| (distance to the origin)
+        r_final_np = np.linalg.norm(x_final_np, axis=-1)  # (B, N)
 
-            # Print ranges
-            print(f"[x_final] x range: [{x_final_np[..., 0].min():.4f}, {x_final_np[..., 0].max():.4f}]")
-            print(f"[x_final] y range: [{x_final_np[..., 1].min():.4f}, {x_final_np[..., 1].max():.4f}]")
-            print(f"[x_final] z range: [{x_final_np[..., 2].min():.4f}, {x_final_np[..., 2].max():.4f}]")
-            print(f"[r_final] range: [{r_final_np.min():.4f}, {r_final_np.max():.4f}]")
-        else:
-            # 2D mode: get the velocity field at the final time; the velocity magnitude is r
-            t_final = torch.ones(b, 1, 1, device=device) * (1.0 - 1e-5)
-            v_final = ode.drift_coefficient(x_final, t_final)  # (B, N, 2)
-            r_final = torch.linalg.norm(v_final, dim=-1)  # (B, N)
-            r_final_np = r_final.detach().cpu().numpy()  # (B, N)
-
-            # Print ranges
-            print(f"[x_final] theta range: [{x_final_np[..., 0].min():.4f}, {x_final_np[..., 0].max():.4f}]")
-            print(f"[x_final] phi range: [{x_final_np[..., 1].min():.4f}, {x_final_np[..., 1].max():.4f}]")
-            print(f"[r_final] range: [{r_final_np.min():.4f}, {r_final_np.max():.4f}]")
-
-            # Convert to Cartesian coordinates (using r as the radius)
-            xyz_all = theta_phi_to_cartesian(x_final_np, r_final_np)  # (B, N, 3)
+        # Print ranges
+        print(f"[x_final] x range: [{x_final_np[..., 0].min():.4f}, {x_final_np[..., 0].max():.4f}]")
+        print(f"[x_final] y range: [{x_final_np[..., 1].min():.4f}, {x_final_np[..., 1].max():.4f}]")
+        print(f"[x_final] z range: [{x_final_np[..., 2].min():.4f}, {x_final_np[..., 2].max():.4f}]")
+        print(f"[r_final] range: [{r_final_np.min():.4f}, {r_final_np.max():.4f}]")
 
     print(f"[Output] xyz shape: {xyz_all.shape}")
 
@@ -593,14 +469,9 @@ def main():
 
     r_list = [r_final_np[i] for i in range(B)]
 
-    if args.mode == "3d":
-        # 3D mode: directly visualize the xyz point cloud, with r shown by color
-        vis_path = os.path.join(vis_dir, "xyz_vis.png")
-        visualize_xyz_pointcloud(xyz_list, r_list, vis_path, sample_indices=list(range(B)))
-    else:
-        # 2D mode: sphere visualization, with r shown by color
-        vis_path = os.path.join(vis_dir, "sphere_vis.png")
-        visualize_sphere_with_r(xyz_list, r_list, vis_path, sample_indices=list(range(B)))
+    # Directly visualize the xyz point cloud, with r shown by color
+    vis_path = os.path.join(vis_dir, "xyz_vis.png")
+    visualize_xyz_pointcloud(xyz_list, r_list, vis_path, sample_indices=list(range(B)))
 
     print("[Done] Evaluation complete!")
 
