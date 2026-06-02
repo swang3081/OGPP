@@ -22,7 +22,7 @@ import math
 import numpy as np
 from pathlib import Path
 from flow_lab.sort_numba import hilbert_sort_xy_fast
-# 简单无条件 ODE 包装
+# Simple unconditional ODE wrapper
 class VectorFieldODE:
     def __init__(self, net):
         self.net = net
@@ -54,18 +54,18 @@ def main():
     p.add_argument("--y_scale", type=float, default=1.0)
 
 
-    # 新增：文本输出与输出目录
+    # New: text output and output directory
     p.add_argument("--use_PE", action="store_true")
     p.add_argument("--jitter_x0", action="store_true")
     p.add_argument("--sort_x0", action="store_true")
     p.add_argument("--gaussian_init", action="store_true")
 
     p.add_argument("--periodic", action="store_true")
-    p.add_argument("--output_txt", action="store_true", help="同时把采样的点写为 txt 文件")
+    p.add_argument("--output_txt", action="store_true", help="Also write the sampled points as a txt file")
     p.add_argument("--render_image", action="store_true", help="render image")
-    p.add_argument("--out_dir", type=str, default="outputs", help="图与txt输出目录")
+    p.add_argument("--out_dir", type=str, default="outputs", help="Output directory for images and txt")
     p.add_argument("--output_trajectory", action="store_true",
-                   help="若开启，则保存轨迹帧到 out_dir/trajectory 并导出视频")
+                   help="If enabled, save trajectory frames to out_dir/trajectory and export a video")
 
     p.add_argument("--exp_name", type=str, default=None,
                 help="folder name under out_dir/3d_pts for 3D point clouds. "
@@ -81,7 +81,7 @@ def main():
 
     args = p.parse_args()
 
-    # 设置随机种子以确保可复现性
+    # Set random seed for reproducibility
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     if torch.cuda.is_available():
@@ -90,7 +90,7 @@ def main():
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
-    # dataset sampler (只为 p_data / p_simple shape 提供接口)
+    # dataset sampler (only provides an interface for the p_data / p_simple shape)
     if args.jitter_x0:
         print("jitter!")
         p_simple = JitterHilbertGridSample(grid_size=32, jitter="uniform", periodic=args.periodic, seed=1234).to(device)
@@ -107,7 +107,7 @@ def main():
     #     p_data=sampler,
     # ).to(device)
 
-    # init model (结构要和训练时一致)
+    # init model (structure must match training)
     # model = UncondUniGBNTransformer(
     #     n_points=args.n_points, in_dim=args.in_out_dim, out_dim= args.in_out_dim, embed_dim=args.embed_dim, depth=args.depth, num_heads=args.num_heads, mlp_ratio=args.mlp_ratio, t_embed_dim=40
     # ).to(device)
@@ -130,7 +130,7 @@ def main():
     model.eval()
     print(f"[ckpt] loaded from {args.ckpt}")
 
-    # 确保输出目录存在（用于 txt 或可能的图片保存）
+    # Ensure the output directory exists (for txt or possible image saving)
     os.makedirs(args.out_dir, exist_ok=True)
 
     # sampling
@@ -150,7 +150,7 @@ def main():
                     x0.detach().cpu().numpy())
                 ).to(x0.device)
 
-        # 如果指定了 indices，则只取这些索引
+        # If indices are specified, take only those indices
         if args.indices is not None:
             indices = [int(i.strip()) for i in args.indices.split(",")]
             x0 = x0[indices]
@@ -159,21 +159,21 @@ def main():
 
         ts = torch.linspace(0, 1, args.sample_steps, device=device).view(1, -1, 1, 1).expand(b, -1, 1, 1)
         if args.output_trajectory:
-            # ===== 轨迹模式 =====
+            # ===== Trajectory mode =====
             xs = simulator.simulate_with_trajectory(x0, ts, periodic=args.periodic)  # (B,T,N,2)
             print("[trajectory] xs shape:", xs.shape)
 
-            # 应用 x_scale/y_scale 到整个轨迹
+            # Apply x_scale/y_scale to the entire trajectory
             xs[..., 0] = xs[..., 0] * args.x_scale
             xs[..., 1] = xs[..., 1] * args.y_scale
 
-            x1 = xs[:, -1]  # 在 scale 之后取最终步
+            x1 = xs[:, -1]  # take the final step after scaling
             print("[trajectory] x1 shape:", x1.shape)
 
-            # 保存帧
+            # Save frames
             exp_name = args.exp_name or Path(args.ckpt).stem
             frames_dir = os.path.join(args.out_dir, exp_name, "trajectory")
-            # nrow 尽量取 sqrt(b) 的上取整，更均衡的拼图排布
+            # nrow takes ceil(sqrt(b)) for a more balanced grid layout
             nrow = int(math.ceil(math.sqrt(b)))
             T = save_trajectory_frames(
                 xs=xs,
@@ -184,13 +184,13 @@ def main():
             )
             print(f"[trajectory] saved {T} frames to: {os.path.abspath(frames_dir)}")
 
-            # 合成视频
+            # Compose video
             # video_path = os.path.join(args.out_dir, "trajectory.mp4")
             # write_video_from_frames(frames_dir, video_path, fps=12)
 
             # print(f"[trajectory] wrote video to: {os.path.abspath(video_path)}")
 
-            # === 新增：如果是 3D 且 output_trajectory=True，则导出每个时间步的 PLY 序列（用于 Blender 动画） ===
+            # === New: if 3D and output_trajectory=True, export a PLY sequence for each time step (for Blender animation) ===
             if args.in_out_dim == 3:
                 traj_ply_dir = os.path.join(args.out_dir, exp_name, "trajectory_ply")
                 os.makedirs(traj_ply_dir, exist_ok=True)
@@ -205,15 +205,15 @@ def main():
                     for b_idx in range(B):
                         pts = Xs[b_idx, t_idx].numpy().astype(np.float32)  # (N,3)
 
-                        # 简单上个颜色（和静态 3D 输出保持一致：首/中/尾高亮）
+                        # Apply a simple color (consistent with the static 3D output: highlight first/middle/last)
                         colors = np.full((N_pts, 3), 200, dtype=np.uint8)
                         special_idx   = [0, N_pts // 2, N_pts - 1]
-                        special_color = [(255, 0, 0), (255, 255, 0), (0, 0, 255)]  # 红/黄/蓝
+                        special_color = [(255, 0, 0), (255, 255, 0), (0, 0, 255)]  # red/yellow/blue
                         for idx, col in zip(special_idx, special_color):
                             if 0 <= idx < N_pts:
                                 colors[idx] = np.array(col, dtype=np.uint8)
 
-                        # 文件名：frame_{t}_b{b}.ply
+                        # Filename: frame_{t}_b{b}.ply
                         ply_name = f"frame_{t_idx:04d}_b{b_idx}.ply"
                         ply_path = os.path.join(traj_ply_dir, ply_name)
                         save_pointcloud_ply(pts, ply_path, colors_np=colors, binary=True)
@@ -222,7 +222,7 @@ def main():
 
         else:
             x1 = simulator.simulate(x0, ts, periodic=args.periodic)  # (B,N,2)
-            # 非轨迹模式，在这里应用 scale
+            # Non-trajectory mode, apply scale here
             x1[..., 0] = x1[..., 0] * args.x_scale
             x1[..., 1] = x1[..., 1] * args.y_scale
 
@@ -256,10 +256,10 @@ def main():
 
             plt.show()
 
-        # 如果需要，同时把 x1 写成 txt
+        # If needed, also write x1 as txt
         if args.output_txt:
             if args.in_out_dim == 3:
-                # —— 3D：同时导出 txt 和 PLY 到 outputs/3d_pts/<exp_name>/{txt,ply} —— #
+                # —— 3D: export both txt and PLY to outputs/3d_pts/<exp_name>/{txt,ply} —— #
                 exp_name = args.exp_name or Path(args.ckpt).stem
                 exp_root = os.path.join(args.out_dir, "3d_pts", exp_name)
                 ply_dir  = os.path.join(exp_root, "ply")
@@ -270,9 +270,9 @@ def main():
                 X = x1.detach().cpu()  # (B,N,3)
                 B, N, _ = X.shape
                 for i in range(B):
-                    pts = X[i].numpy().astype(np.float32)  # (N,3) 原坐标不做归一化
+                    pts = X[i].numpy().astype(np.float32)  # (N,3) original coordinates, not normalized
 
-                    # 1) 写 txt：第一行 N，后面每行 x y z
+                    # 1) Write txt: first line is N, then each line is x y z
                     txt_path = os.path.join(txt_dir, f"pts_{i}.txt")
                     with open(txt_path, "w", encoding="utf-8") as f:
                         f.write(f"{N}\n")
@@ -280,10 +280,10 @@ def main():
                             x, y, z = pts[j].tolist()
                             f.write(f"{x:.6f} {y:.6f} {z:.6f}\n")
 
-                    # 2) 写 ply：并高亮 first/middle/last
+                    # 2) Write ply: and highlight first/middle/last
                     colors = np.full((N, 3), 200, dtype=np.uint8)
                     special_idx   = [0, N // 2, N - 1]
-                    special_color = [(255, 0, 0), (255, 255, 0), (0, 0, 255)]  # 红/黄/蓝
+                    special_color = [(255, 0, 0), (255, 255, 0), (0, 0, 255)]  # red/yellow/blue
                     for idx, col in zip(special_idx, special_color):
                         if 0 <= idx < N:
                             colors[idx] = np.array(col, dtype=np.uint8)
@@ -293,7 +293,7 @@ def main():
 
                 print(f"[3D txt] wrote {B} files to: {os.path.abspath(txt_dir)}")
                 print(f"[3D ply] wrote {B} files to: {os.path.abspath(ply_dir)}")
-                print("Blender: File > Import > Stanford (.ply) -> 选择上述 ply 目录")
+                print("Blender: File > Import > Stanford (.ply) -> select the ply directory above")
             else:
                 os.makedirs(os.path.join(args.out_dir, args.exp_name, "txt"), exist_ok=True)
                 X = x1.detach().cpu()  # (B,N,2) on CPU
@@ -303,9 +303,9 @@ def main():
                     # fpath = os.path.join(args.out_dir, f"pts_{i}.txt")
                     fpath = os.path.join(args.out_dir, args.exp_name, "txt", f"pts_{i}.txt")
                     with open(fpath, "w", encoding="utf-8") as f:
-                        # 第一行写 N
+                        # First line writes N
                         f.write(f"{N}\n")
-                        # 从第二行开始，每行写一个点: x y
+                        # From the second line on, write one point per line: x y
                         for j in range(N):
                             x, y = X[i, j].tolist()
                             f.write(f"{x:.6f} {y:.6f}\n")

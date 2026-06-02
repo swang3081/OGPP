@@ -18,7 +18,7 @@ from flow_lab.models import UncondUniGBNTransformer, UncondUniGBNTransformer_PE
 from flow_lab.utils import save_checkpoint, render_point_images, extract_epoch
 from flow_lab.voronoi import reconstruct_voronoi_images, export_voronoi_samples_for_fid
 from flow_lab.distributions import JitterHilbertGridSample, Uniform
-# 简单无条件 ODE 包装（与 EulerSimulator 的接口一致）
+# Simple unconditional ODE wrapper (matches the EulerSimulator interface)
 
 def build_argparser():
     p = argparse.ArgumentParser()
@@ -53,29 +53,29 @@ def build_argparser():
     p.add_argument("--only_load_model_weight", action="store_true", help="whether use rotation as data augmentation")
     p.add_argument("--data_path", type=str, default="data/1024_10k_original_sorted", help="data path")
     p.add_argument("--log_path", type=str, default="log", help="data path")
-    p.add_argument("--ckpt_path", type=str, default="checkpoints/voronoi_uncond/UncondVoronoiTransformer_epoch651_e20000_1759864859.pt", help="指定 checkpoint 文件路径")
+    p.add_argument("--ckpt_path", type=str, default="checkpoints/voronoi_uncond/UncondVoronoiTransformer_epoch651_e20000_1759864859.pt", help="Specify checkpoint file path")
     p.add_argument("--use_warmup", action="store_true")
     p.add_argument("--use_cos_decay", action="store_true")
     p.add_argument("--warmup_steps", type=int, default=None)
 
-    # Async loader 相关参数
+    # Async loader related arguments
     p.add_argument("--use_async_loader", action="store_true")
     p.add_argument("--overwrite_lr", action="store_true")
-    p.add_argument("--use_ot_match", action="store_true", help="使用 OT 匹配 (PointSetMiniBatchOTDataset)")
+    p.add_argument("--use_ot_match", action="store_true", help="Use OT matching (PointSetMiniBatchOTDataset)")
 
-    p.add_argument("--prefetch_batches", type=int, default=2, help="异步加载预取 batch 数")
-    p.add_argument("--ot_num_workers", type=int, default=8, help="OT cost matrix 计算的并行 worker 数")
-    p.add_argument("--use_PE", action="store_true", help="使用带位置编码的 Transformer (UncondUniGBNTransformer_PE)")
-    p.add_argument("--use_eqfm", action="store_true", help="使用 Equivariant OT Flow Matching (PointSetEqOTFMDataset)")
+    p.add_argument("--prefetch_batches", type=int, default=2, help="Number of prefetch batches for async loading")
+    p.add_argument("--ot_num_workers", type=int, default=8, help="Number of parallel workers for OT cost matrix computation")
+    p.add_argument("--use_PE", action="store_true", help="Use Transformer with positional encoding (UncondUniGBNTransformer_PE)")
+    p.add_argument("--use_eqfm", action="store_true", help="Use Equivariant OT Flow Matching (PointSetEqOTFMDataset)")
     p.add_argument("--point_ot_solver", type=str, default="hungarian", choices=["greedy", "hungarian"],
-                   help="点级别 OT 求解器类型 (用于 use_eqfm)")
+                   help="Point-level OT solver type (for use_eqfm)")
     p.add_argument("--batch_ot_solver", type=str, default="greedy", choices=["greedy", "hungarian"],
-                   help="Batch 级别 OT 求解器类型 (用于 use_eqfm)")
+                   help="Batch-level OT solver type (for use_eqfm)")
 
     return p
 
 def main(args=None):
-    if args is None:  # CLI 路径
+    if args is None:  # CLI path
         args = build_argparser().parse_args()
 
     ckpt_dir = os.path.join(args.log_path, args.exp_name, "checkpoints")
@@ -88,11 +88,11 @@ def main(args=None):
     if args.jitter_x0:
         p_simple = JitterHilbertGridSample(grid_size=32, jitter="uniform", periodic=False, seed=1234).to(device)        
 
-    # Dataset 初始化：根据是否使用 async loader 和 OT 匹配选择不同的 dataset
+    # Dataset initialization: choose a different dataset depending on whether async loader and OT matching are used
     mesh_dataset = None
     if args.use_async_loader:
         if args.use_eqfm:
-            # 使用 Equivariant OT Flow Matching dataset
+            # Use the Equivariant OT Flow Matching dataset
             mesh_dataset = PointSetEqOTFMDataset(
                 data_dir=args.data_path,
                 rotate4=args.data_aug_rotate,
@@ -105,7 +105,7 @@ def main(args=None):
             )
             print(f"[Async Mode] Using PointSetEqOTFMDataset with point_ot={args.point_ot_solver}, batch_ot={args.batch_ot_solver}, {args.ot_num_workers} workers")
         elif args.use_ot_match:
-            # 使用带 OT 匹配的 dataset
+            # Use the dataset with OT matching
             mesh_dataset = PointSetMiniBatchOTDataset(
                 data_dir=args.data_path,
                 rotate4=args.data_aug_rotate,
@@ -117,7 +117,7 @@ def main(args=None):
             )
             print(f"[Async Mode] Using PointSetMiniBatchOTDataset with {args.batch_ot_solver} OT solver, {args.ot_num_workers} workers")
         else:
-            # 使用 UniGBNSampler (已添加 compute_batch 方法)
+            # Use UniGBNSampler (compute_batch method added)
             mesh_dataset = UniGBNSampler(
                 data_dir=args.data_path,
                 random_shuffle=args.random_shuffle_z,
@@ -127,7 +127,7 @@ def main(args=None):
             print("[Async Mode] Using UniGBNSampler with compute_batch interface")
         print(f"Total number of data points: {mesh_dataset.num_meshes}")
 
-        # 创建一个 dummy sampler 用于 path（async 模式下不实际使用）
+        # Create a dummy sampler for path (not actually used in async mode)
         sampler = UniGBNSampler(
             data_dir=args.data_path,
             random_shuffle=args.random_shuffle_z,
@@ -135,7 +135,7 @@ def main(args=None):
             preload=True,
         ).to(device)
     else:
-        # 原有同步模式
+        # Original synchronous mode
         sampler = UniGBNSampler(
             data_dir=args.data_path,
             random_shuffle=args.random_shuffle_z,
@@ -154,16 +154,16 @@ def main(args=None):
         num_rows, num_cols = 2, 2
         k = num_rows * num_cols
 
-        # 根据是否使用 async loader 和特殊 dataset 来获取 x0, x1 pair
+        # Get the x0, x1 pair based on whether async loader and a special dataset are used
         if mesh_dataset is not None and hasattr(mesh_dataset, 'compute_batch'):
-            # 使用 compute_batch 获取 (x0, x1) pair
+            # Use compute_batch to get the (x0, x1) pair
             idx_batch = np.arange(k)
             x0_np, x1_np = mesh_dataset.compute_batch(idx_batch, epoch=0, step=0)
             x0 = torch.from_numpy(x0_np).to(device)
             x1 = torch.from_numpy(x1_np).to(device)
             print(f"[VIS] Using compute_batch: x0 shape={x0.shape}, x1 shape={x1.shape}")
         else:
-            # 原来的方式：从 path.p_data 获取 x1，从 p_simple 采样 x0
+            # Original way: get x1 from path.p_data, sample x0 from p_simple
             x1, _ = path.p_data.get_batch(range(k))  # (k, N, D)
             x0, _ = path.p_simple.sample(k)          # (k, N, D)
             print(f"[VIS] Using p_data/p_simple: x0 shape={x0.shape}, x1 shape={x1.shape}")
@@ -172,7 +172,7 @@ def main(args=None):
         ts = torch.linspace(0, 1, args.viz_steps, device=device)
         for tidx, t in enumerate(ts):
             tt = t.view(1, 1, 1).expand(k, 1, 1)
-            # 使用线性插值: xt = (1-t)*x0 + t*x1
+            # Use linear interpolation: xt = (1-t)*x0 + t*x1
             xt = path.sample_conditional_path_inputx0(x0, x1, tt)  # (k, N, D)
             imgs = render_point_images(
                 xt,
@@ -197,7 +197,7 @@ def main(args=None):
         if not is_headless:
             plt.show()
 
-    # 根据 --use_PE 选择模型
+    # Select the model based on --use_PE
     ModelCls = UncondUniGBNTransformer_PE if args.use_PE else UncondUniGBNTransformer
     model = ModelCls(
         n_points=args.n_points, in_dim=args.in_out_dim, out_dim=args.in_out_dim, embed_dim=args.embed_dim, depth=args.depth, num_heads=args.num_heads, mlp_ratio=args.mlp_ratio, t_embed_dim=40
@@ -242,10 +242,10 @@ def main(args=None):
         print(f"[ckpt] Saved interrupted checkpoint to: {ckpt_path}")
         sys.exit(0)    
     finally:
-        # 无论是否被打断，都确保 flush + close
+        # Ensure flush + close regardless of whether it was interrupted
         if getattr(trainer, "writer", None) is not None:
             try:
-                # TB: 有 flush(); MLflowWriter 可实现空的 flush()
+                # TB: has flush(); MLflowWriter can implement an empty flush()
                 trainer.writer.flush()
             finally:
                 trainer.writer.close()
