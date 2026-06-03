@@ -46,43 +46,23 @@ scripts/       train / inference entry points
 The datasets are available here:
 [Google Drive](https://drive.google.com/drive/folders/13kfWJqhXrnrUBi1H5-ZSewGNlHNzrb_H?usp=sharing)
 
-## Train
+## Train example
 
 Each script defines its own arguments — run `python scripts/<script>.py -h` to
-list them and add flags (e.g. `--exp_name`, `--batch_size`) as needed.
+list them and add flags (e.g. `--data_path`, `--exp_name`, `--batch_size`) as needed.
 
 ```bash
 # blue noise (2D point sets, single GPU, see run_blue_noise_multiGPU.py for the multiple GPU script)
-python scripts/run_blue_noise.py
-
-# DLA
-python scripts/run_dla.py
-
-# Thomson
-python scripts/run_thomson_multi.py
-
-# 3D shape
-python scripts/run_shape.py
-
-# minimal surface — fixed 3 anchors (--mode default|minibatch_ot|eqotfm)
-python scripts/run_minimalsurface_multimode.py
-
-# minimal surface — variable 3-8 anchors
-python scripts/run_minimalsurface_variable.py
+python scripts/run_blue_noise.py --data_path <blue_noise_npz_path> --n_points 1024 --epochs 1000
 ```
 
-## Inference
+## Inference example
 
 Each domain has a matching `eval_*.py` entry point that loads a trained
 checkpoint and samples over a sweep of sampling steps:
 
 ```bash
-python scripts/eval_blue_noise.py --ckpt <path/to/checkpoint.pt>  # blue noise (2D point sets)
-python scripts/eval_dla.py             # DLA
-python scripts/eval_shape.py           # 3D shape
-python scripts/eval_thomson_multi.py   # Thomson
-python scripts/eval_minimal_surface.py # minimal surface
-python scripts/eval_minimal_surface_variable.py # minimal surface （variable anchors)
+python scripts/eval_blue_noise.py --ckpt <path/to/checkpoint.pt>  --n_points 1024 --n_point_set 32 --sample_steps 200
 ```
 
 ## Baselines
