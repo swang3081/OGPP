@@ -48,18 +48,27 @@ The datasets are available here:
 
 ## Train
 
+Each script defines its own arguments — run `python scripts/<script>.py -h` to
+list them and add flags (e.g. `--exp_name`, `--batch_size`) as needed.
+
 ```bash
 # blue noise (2D point sets, single GPU, see run_blue_noise_multiGPU.py for the multiple GPU script)
-python scripts/run_blue_noise.py --exp_name blue_noise_ours --batch_size 256
+python scripts/run_blue_noise.py
 
 # DLA
-python scripts/run_dla.py --exp_name dla_ours
+python scripts/run_dla.py
 
 # Thomson
-python scripts/run_thomson_multi.py --exp_name thomson_ours
+python scripts/run_thomson_multi.py
 
 # 3D shape
-python scripts/run_shape.py --exp_name shape_linear --batch_size 256 --n_points 2048
+python scripts/run_shape.py --n_points 2048
+
+# minimal surface — fixed 3 anchors (--mode default|minibatch_ot|eqotfm)
+python scripts/run_minimalsurface_multimode.py --data_path <anchors+edge_points.npz>
+
+# minimal surface — variable 3-8 anchors
+python scripts/run_minimalsurface_variable.py --data_path <variable_anchors.npz>
 ```
 
 ## Inference
