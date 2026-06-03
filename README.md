@@ -62,13 +62,13 @@ python scripts/run_dla.py
 python scripts/run_thomson_multi.py
 
 # 3D shape
-python scripts/run_shape.py --n_points 2048
+python scripts/run_shape.py
 
 # minimal surface — fixed 3 anchors (--mode default|minibatch_ot|eqotfm)
-python scripts/run_minimalsurface_multimode.py --data_path <3_anchors.npz>
+python scripts/run_minimalsurface_multimode.py
 
 # minimal surface — variable 3-8 anchors
-python scripts/run_minimalsurface_variable.py --data_path <variable_anchors.npz>
+python scripts/run_minimalsurface_variable.py
 ```
 
 ## Inference
