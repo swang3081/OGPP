@@ -13,7 +13,7 @@ Our paper and video results can be found at our [project website](https://ogpp.s
 | **Shape** (3D point cloud / mesh) | `scripts/run_shape.py` | `scripts/eval_shape.py` |
 | **DLA** (2D diffusion-limited aggregation) | `scripts/run_dla.py` | `scripts/eval_dla.py` |
 | **Thomson** (points on a sphere) | `scripts/run_thomson_multi.py` | `scripts/eval_thomson_multi.py` |
-| **Minimal surface** (*conditional*) | `scripts/run_minimalsurface_multimode.py` | `scripts/eval_minimal_surface*.py` |
+| **Minimal surface** | `scripts/run_minimalsurface_*.py` | `scripts/eval_minimal_surface*.py` |
 
 ## Setup
 
