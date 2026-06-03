@@ -96,7 +96,8 @@ vendored here:
   and `third_party/PyTorchEMD`). See [`BASELINES.md`](BASELINES.md) for how to
   build them and make them importable.
 - **Blue noise.** We use the spectral / radial blue-noise metrics from the
-  **GBN (Gaussian Blue Noise)** reference implementation.
+  **GBN (Gaussian Blue Noise)** reference implementation
+  ([project page](https://abdallagafar.com/publications/gbn/)).
 
 ## Baselines
 
