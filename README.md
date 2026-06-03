@@ -7,13 +7,13 @@ by [Sinan Wang](https://sinanw.com/)\*, [Jinjin He](https://jinjinhe2001.github.
 Our paper and video results can be found at our [project website](https://ogpp.sinanw.com/).
 
 
-| Domain | Train | Inference |
-|---|---|---|
-| **Blue noise** (2D blue-noise point sets) | `scripts/run_blue_noise.py` | `scripts/eval_blue_noise.py` |
-| **Shape** (3D point cloud / mesh) | `scripts/run_shape.py` | `scripts/eval_shape.py` |
-| **DLA** (2D diffusion-limited aggregation) | `scripts/run_dla.py` | `scripts/eval_dla.py` |
-| **Thomson** (points on a sphere) | `scripts/run_thomson_multi.py` | `scripts/eval_thomson_multi.py` |
-| **Minimal surface** | `scripts/run_minimalsurface_*.py` | `scripts/eval_minimal_surface*.py` |
+| Domain | Train | Inference | Metrics |
+|---|---|---|---|
+| **Blue noise** (2D blue-noise point sets) | `scripts/run_blue_noise.py` | `scripts/eval_blue_noise.py` | GBN code (external) |
+| **Shape** (3D point cloud / mesh) | `scripts/run_shape.py` | `scripts/eval_shape.py` | LION CD/EMD (external) |
+| **DLA** (2D diffusion-limited aggregation) | `scripts/run_dla.py` | `scripts/eval_dla.py` | `scripts/eval_dla_metrics.py`, `scripts/evaluate_dla_folder.py` |
+| **Thomson** (points on a sphere) | `scripts/run_thomson_multi.py` | `scripts/eval_thomson_multi.py` | `scripts/eval_thomson_metrics.py`, `scripts/evaluate_thomson_folder.py` |
+| **Minimal surface** | `scripts/run_minimalsurface_*.py` | `scripts/eval_minimal_surface*.py` | `scripts/eval_minimal_surface_metrics.py`, `scripts/evaluate_minimal_surface_folder.py` |
 
 ## Setup
 
@@ -64,6 +64,39 @@ checkpoint and samples over a sweep of sampling steps:
 ```bash
 python scripts/eval_blue_noise.py --ckpt <path/to/checkpoint.pt>  --n_points 1024 --n_point_set 32 --sample_steps 200
 ```
+
+## Quantitative metrics
+
+Three domains ship with quantitative-evaluation scripts (see the **Metrics**
+column above). Each domain provides a **core metrics module** (the per-sample
+metric definitions, also runnable on a single file) and a **folder evaluator**
+that averages the metrics over all samples produced by the matching `eval_*.py`
+run and writes a `metrics.txt`:
+
+```bash
+# DLA — fractal dimension, lacunarity, angular uniformity, ...
+python scripts/evaluate_dla_folder.py --folder <eval_output>/step_20
+
+# Thomson — Coulomb / spring energy, dimensionless E*, tangent force, spacing CV
+python scripts/evaluate_thomson_folder.py --folder <eval_output>/step_20
+
+# Minimal surface — area fraction, angle smoothness, curvature, uniformity
+python scripts/evaluate_minimal_surface_folder.py --folder <eval_output>/step_20
+```
+
+The folder evaluator expects the sample sub-directory layout written by the
+corresponding `eval_*.py` script (`ply/` for DLA / Thomson, `npz/` for minimal
+surface). Run `python scripts/<script>.py -h` for the full flag list.
+
+The remaining two domains are scored with **external** code rather than scripts
+vendored here:
+
+- **Shape (3D point cloud).** We use the Chamfer Distance / EMD metric kernels
+  from [LION](https://github.com/nv-tlabs/LION) (`third_party/ChamferDistancePytorch/chamfer3D`
+  and `third_party/PyTorchEMD`). See [`BASELINES.md`](BASELINES.md) for how to
+  build them and make them importable.
+- **Blue noise.** We use the spectral / radial blue-noise metrics from the
+  **GBN (Gaussian Blue Noise)** reference implementation.
 
 ## Baselines
 

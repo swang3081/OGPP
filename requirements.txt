@@ -1,6 +1,8 @@
 POT
 tqdm
 numba
+scipy
+trimesh
 matplotlib
 lap
 tensorboard
