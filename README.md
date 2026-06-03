@@ -35,11 +35,11 @@ scripts/       train / inference entry points
 ```
 
 `flow_lab/` module map:
-- `paths.py` — conditional probability paths (linear, quadratic/cubic Hermite, GenVP)
-- `models.py` / `models_conditional.py` — transformer & PVCNN velocity models
-- `dynamics.py` — ODE/SDE samplers
-- `trainers.py` — training loops (incl. async CPU x0/x1 prefetch for mesh)
-- `datasets.py` — mesh nearest-point, Poisson-sphere, OT / mini-batch-OT datasets
+- `paths.py`: conditional probability paths (linear, quadratic/cubic Hermite, GenVP)
+- `models.py` / `models_conditional.py`: transformer & PVCNN velocity models
+- `dynamics.py`: ODE/SDE samplers
+- `trainers.py`: training loops (incl. async CPU x0/x1 prefetch for mesh)
+- `datasets.py`: mesh nearest-point, Poisson-sphere, OT / mini-batch-OT datasets
 - `distributions.py`, `voronoi.py`, `sort_numba.py`, `io.py`, `utils.py`
 
 ## Data
@@ -48,7 +48,7 @@ The datasets are available here:
 
 ## Train example
 
-Each script defines its own arguments — run `python scripts/<script>.py -h` to
+Each script defines its own arguments: run `python scripts/<script>.py -h` to
 list them and add flags (e.g. `--data_path`, `--exp_name`, `--batch_size`) as needed.
 
 ```bash
@@ -74,13 +74,13 @@ that averages the metrics over all samples produced by the matching `eval_*.py`
 run and writes a `metrics.txt`:
 
 ```bash
-# DLA — fractal dimension, lacunarity, angular uniformity, ...
+# DLA: fractal dimension, lacunarity, angular uniformity, ...
 python scripts/evaluate_dla_folder.py --folder <eval_output>/step_20
 
-# Thomson — Coulomb / spring energy, dimensionless E*, tangent force, spacing CV
+# Thomson: Coulomb / spring energy, dimensionless E*, tangent force, spacing CV
 python scripts/evaluate_thomson_folder.py --folder <eval_output>/step_20
 
-# Minimal surface — area fraction, angle smoothness, curvature, uniformity
+# Minimal surface: area fraction, angle smoothness, curvature, uniformity
 python scripts/evaluate_minimal_surface_folder.py --folder <eval_output>/step_20
 ```
 
